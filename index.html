@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログインシステム</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+        #logoutSection, #adminSection, #uploadSection {
+            display: none;
+        }
+        .preview-img {
+            width: 100px;
+            height: auto;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h2>ログインシステム</h2>
+    <div id="loginForm">
+        <input type="text" id="username" placeholder="ユーザー名"><br><br>
+        <input type="password" id="password" placeholder="パスワード"><br><br>
+        <button onclick="login()">ログイン</button>
+        <button onclick="register()">新規登録</button>
+    </div>
+    
+    <div id="logoutSection">
+        <h3 id="welcomeMessage"></h3>
+        <button onclick="logout()">ログアウト</button>
+    </div>
+    
+    <div id="adminSection">
+        <h3>管理者専用パネル</h3>
+        <button onclick="showAllUsers()">全ユーザー情報</button>
+        <input type="text" id="banUser" placeholder="BANするユーザー名">
+        <button onclick="banUser()">BAN</button>
+        <div id="userList"></div>
+        <div id="allUserFiles"></div>
+    </div>
+    
+    <div id="uploadSection">
+        <h3>ファイルアップロード</h3>
+        <input type="file" id="fileInput" multiple accept="image/*">
+        <button onclick="uploadFiles()">アップロード</button>
+        <div id="fileList"></div>
+    </div>
+
+    <script>
+        const adminUser = "ゔぃぎゃん";
+        const adminPassword = "123456";
+        let users = JSON.parse(localStorage.getItem("users")) || { "ゔぃぎゃん": "123456" };
+        let bannedUsers = JSON.parse(localStorage.getItem("bannedUsers")) || [];
+        let userFiles = JSON.parse(localStorage.getItem("userFiles")) || {};
+
+        function register() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            
+            if (!username || !password) {
+                alert("ユーザー名とパスワードを入力してください。");
+                return;
+            }
+            if (users[username]) {
+                alert("このユーザー名は既に登録されています。");
+                return;
+            }
+            
+            users[username] = password;
+            localStorage.setItem("users", JSON.stringify(users));
+            alert("登録完了！ログインしてください。");
+        }
+
+        function login() {
+            const username = document.getElementById("username").value;
+            const password = document.getElementById("password").value;
+            
+            if (bannedUsers.includes(username)) {
+                alert("このアカウントはBANされています。");
+                return;
+            }
+            
+            if (users[username] && users[username] === password) {
+                localStorage.setItem("loggedInUser", username);
+                alert("ログイン成功！");
+                updateUI();
+            } else {
+                alert("ユーザー名またはパスワードが間違っています。");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem("loggedInUser");
+            alert("ログアウトしました。");
+            updateUI();
+        }
+
+        function banUser() {
+            const banUsername = document.getElementById("banUser").value;
+            if (banUsername && users[banUsername]) {
+                bannedUsers.push(banUsername);
+                localStorage.setItem("bannedUsers", JSON.stringify(bannedUsers));
+                alert(`${banUsername} をBANしました。`);
+            } else {
+                alert("有効なユーザー名を入力してください。");
+            }
+        }
+
+        function showAllUsers() {
+            let userListDiv = document.getElementById("userList");
+            userListDiv.innerHTML = "<h4>登録ユーザー一覧</h4>";
+            for (let user in users) {
+                userListDiv.innerHTML += `<p>${user}</p>`;
+            }
+            showAllUserFiles();
+        }
+
+        function showAllUserFiles() {
+            let allUserFilesDiv = document.getElementById("allUserFiles");
+            allUserFilesDiv.innerHTML = "<h4>全ユーザーのアップロードファイル</h4>";
+            for (let user in userFiles) {
+                allUserFilesDiv.innerHTML += `<h5>${user}のファイル</h5>`;
+                userFiles[user].forEach(fileData => {
+                    allUserFilesDiv.innerHTML += `<div><img src="${fileData.url}" class="preview-img"><p>${fileData.name}</p></div>`;
+                });
+            }
+        }
+
+        function updateFileList() {
+            const loggedInUser = localStorage.getItem("loggedInUser");
+            const fileList = document.getElementById("fileList");
+            fileList.innerHTML = "<h4>アップロード済みファイル</h4>";
+            
+            if (userFiles[loggedInUser]) {
+                userFiles[loggedInUser].forEach(fileData => {
+                    fileList.innerHTML += `<div><img src="${fileData.url}" class="preview-img"><p>${fileData.name}</p></div>`;
+                });
+            }
+        }
+
+        function uploadFiles() {
+            const loggedInUser = localStorage.getItem("loggedInUser");
+            const files = document.getElementById("fileInput").files;
+            
+            if (!userFiles[loggedInUser]) {
+                userFiles[loggedInUser] = [];
+            }
+            if (userFiles[loggedInUser].length + files.length > 100) {
+                alert("最大100個のファイルまでアップロード可能です。");
+                return;
+            }
+            
+            for (let file of files) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    userFiles[loggedInUser].push({ name: file.name, url: event.target.result });
+                    localStorage.setItem("userFiles", JSON.stringify(userFiles));
+                    updateFileList();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById("loginForm").style.display = localStorage.getItem("loggedInUser") ? "none" : "block";
+            document.getElementById("logoutSection").style.display = localStorage.getItem("loggedInUser") ? "block" : "none";
+            document.getElementById("uploadSection").style.display = localStorage.getItem("loggedInUser") ? "block" : "none";
+            document.getElementById("adminSection").style.display = localStorage.getItem("loggedInUser") === adminUser ? "block" : "none";
+            updateFileList();
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
